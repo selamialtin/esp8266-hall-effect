@@ -14,7 +14,7 @@ WiFiServer  TKDServer(9001);      // THE SERVER AND THE PORT NUMBER
 WiFiClient  TKDClient;            // THE SERVER CLIENT
 //====================================================================================
 int WaitACK = 1;
-
+int NoAlarmData = 0;
 void setup()
 {
   // Setting The Serial Port
@@ -40,14 +40,29 @@ void loop()
 
   IsClient();
   IsAlarm();
+  IsConnected();
+}
 
+//====================================================================================
+
+void IsConnected()
+{
+  if (NoAlarmData > 100) {
+    // connection lost, restarting server
+     Serial.println("connection lost, restarting server");
+     TKDServer.stop();
+     delay(100);
+     TKDServer.begin();
+     WaitACK = 1;
+     NoAlarmData = 0;
+  }
 }
 
 //====================================================================================
 
 int Alarm(int dly)
 {
-  //digitalWrite(LED2, HIGH);
+  digitalWrite(LED2, HIGH);
   digitalWrite(BUZZER_PIN, LOW);
   delay(dly);
   digitalWrite(BUZZER_PIN, HIGH);
@@ -94,33 +109,30 @@ void IsAlarm()
   if (TKDClient && TKDClient.connected())
   {
     Serial.println("Waiting alarm data");
-    int timeOut = 500;
-    while (timeOut > 0)
+    if (TKDClient.available())
     {
-      if (TKDClient.available())
+      // If Any Data Was Available We Read IT
+      while (TKDClient.available())
       {
-        // If Any Data Was Available We Read IT
-        while (TKDClient.available())
-        {
-          // Read From Client
-          //digitalWrite(LED2, LOW);
-          String line = TKDClient.readStringUntil('\n');
-          Serial.println(line);
-          //digitalWrite(LED2, HIGH);
-          if (line.indexOf("<ALARM>") > -1) {
-            Alarm(250);
-          } else {
-            delay(250);
-            //digitalWrite(LED2, LOW);
-          }
+        NoAlarmData = 0;
+        // Read From Client
+        digitalWrite(LED2, LOW);
+        String line = TKDClient.readStringUntil('\n');
+        Serial.println(line);
+        digitalWrite(LED2, HIGH);
+        if (line.indexOf("<ALARM>") > -1) {
+          Alarm(250);
+        } else {
+          delay(100);
+          digitalWrite(LED2, LOW);
         }
-      } else {
-        delay(250);
-        timeOut -= 250;
       }
+    } else {
+      delay(50);
+      NoAlarmData++;
     }
   } else {
-    WaitACK = true;
+    WaitACK = 1;
   }
 }
 
@@ -131,7 +143,9 @@ void IsClient()
     return;
   }
   Serial.println("Waiting connection");
-  if (digitalRead(LED0) == HIGH) digitalWrite(LED0, LOW);  
+  if (digitalRead(LED0) == HIGH) {
+    digitalWrite(LED0, LOW);  
+  }
   if (TKDServer.hasClient())
   {
     if (WaitACK) {
@@ -183,8 +197,13 @@ void IsACK()
             // Reply To Client
             TKDClient.println("<OK>");
             TKDClient.flush();
-            digitalWrite(LED0, HIGH);
+
+            //BUG: wifi ledi burada LOW diyince çalisiyor, sebebini bulamadim
+            digitalWrite(LED0, LOW);
+            //digitalWrite(LED0, HIGH);
             WaitACK = 0;
+            Alarm(1000);
+            digitalWrite(LED2, LOW);
           }
         }
       } else {
