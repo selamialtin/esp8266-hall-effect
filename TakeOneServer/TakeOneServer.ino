@@ -55,6 +55,7 @@ void IsConnected()
      TKDServer.begin();
      WaitACK = 1;
      NoAlarmData = 0;
+     digitalWrite(LED2, LOW);
   }
 }
 
@@ -116,7 +117,7 @@ void IsAlarm()
       {
         NoAlarmData = 0;
         // Read From Client
-        digitalWrite(LED2, LOW);
+        //digitalWrite(LED2, LOW);
         String line = TKDClient.readStringUntil('\n');
         Serial.println(line);
         digitalWrite(LED2, HIGH);
