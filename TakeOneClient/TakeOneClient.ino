@@ -29,7 +29,7 @@
 //------------------------------------------------------------------------------------
 // Hall effect sensor Variables
 //------------------------------------------------------------------------------------
-  #define       DIGITAL_PIN      D6 
+  #define       DIGITAL_PIN      D0 
   #define       ANALOG_PIN       A0      
   int Alarm;
   int TimerPos;
@@ -113,10 +113,10 @@
 //====================================================================================
 
   void CheckStatus() {
-    if (++TimerPos == 10) {
+    if (++TimerPos == 20) {
       Serial.println(Alarm);
     
-      if (Alarm > 80) {
+      if (Alarm > 150) {
         SendStatus(STATUS_ALARM); 
       } else {
         SendStatus(STATUS_NORMAL);
