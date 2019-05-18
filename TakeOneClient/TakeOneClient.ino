@@ -30,9 +30,18 @@
 // Hall effect sensor Variables
 //------------------------------------------------------------------------------------
   #define       DIGITAL_PIN      D0 
-  #define       ANALOG_PIN       A0      
+  #define       LED2             D1        // Alarm
+  #define       BUZZER           D2       
+  #define       ANALOG_PIN       A0 
+  #define       WIFI_DISABLE_JUMPER1 D7
+  #define       WIFI_DISABLE_JUMPER0 D8
+  #define       ANALOG_ALARM     566.9 
+       
   int Alarm;
   int TimerPos;
+  int DigitalVal;
+  int WifiTry;
+  float AnalogVal;
 
   void setup() 
   {
@@ -52,9 +61,16 @@
     // Setting The Mode Of Pins ---------------------------------------------
     pinMode(LED0, OUTPUT);          // WIFI OnBoard LED Light
     pinMode(LED1, OUTPUT);          // Indicator For Client #1 Connectivity
-    pinMode(DIGITAL_PIN, INPUT);     
+    pinMode(LED2, OUTPUT);          // Alarm
+    pinMode(WIFI_DISABLE_JUMPER1, OUTPUT);         
+    pinMode(WIFI_DISABLE_JUMPER0, INPUT);         
+    pinMode(DIGITAL_PIN, INPUT); 
     digitalWrite(LED0, !LOW);       // Turn WiFi LED Off
-    
+    digitalWrite(LED2, LOW);       // Turn Alarm Off
+    pinMode(BUZZER, OUTPUT);          // Buzzer
+    digitalWrite(BUZZER, !LOW);  // Turn Buzzer Off
+    digitalWrite(WIFI_DISABLE_JUMPER1, HIGH);  // Turn Buzzer Off
+        
     // Print Message Of I/O Setting Progress --------------------------------
     Serial.println("\nI/O Pins Modes Set .... Done");
 
@@ -64,6 +80,8 @@
 //====================================================================================
   void SetupWifiClient()
   {
+    if (digitalRead(WIFI_DISABLE_JUMPER0) == HIGH) return;
+    
     WiFi.disconnect();
     // Starting To Connect --------------------------------------------------
     WiFi.mode(WIFI_STA);            // To Avoid Broadcasting An SSID
@@ -94,41 +112,47 @@
   
   void loop()
   {
-     // Read the digital interface
+      // Read the analog interface
+      AnalogVal += analogRead(ANALOG_PIN) * 1.0;
+
+      // Read the digital interface
       int digitalVal = digitalRead(DIGITAL_PIN) ; 
-      Serial.println(digitalVal); // print analog value
       if (digitalVal == LOW) // When magnetic field is present, Arduino LED is on
       {
-        Alarm += 10;
+        DigitalVal += 10;
       }
-      CheckStatus();
       
-      // Read the analog interface
-      int analogVal = analogRead(ANALOG_PIN);
-      Serial.println(analogVal); // print analog value
-    
+      CheckStatus();
       delay(50);
   }
   
 //====================================================================================
 
   void CheckStatus() {
-    if (++TimerPos == 20) {
-      Serial.println(Alarm);
-    
-      if (Alarm > 150) {
-        SendStatus(STATUS_ALARM); 
+    TimerPos++;
+    if (TimerPos == 20) {
+      if (digitalRead(LED2) == LOW) digitalWrite(LED2, HIGH);       // Turn Alarm ON
+      AnalogVal = AnalogVal/TimerPos;
+      if (AnalogVal > ANALOG_ALARM) {
+        Serial.printf("Analog: %1.3f - Digital: %d - ALARM\n", AnalogVal, DigitalVal); // print analog value
+        if (digitalRead(BUZZER) == !HIGH) digitalWrite(BUZZER, !HIGH);  // Turn Buzzer On
+        SendStatus(STATUS_ALARM);
       } else {
+        Serial.printf("Analog: %1.3f - Digital: %d - NORMAL\n", AnalogVal, DigitalVal); // print analog value
+        if (digitalRead(BUZZER) == !LOW) digitalWrite(BUZZER, !LOW);  // Turn Buzzer Off
         SendStatus(STATUS_NORMAL);
+        digitalWrite(LED2, LOW);  
       } 
   
-      Alarm = 0;
+      DigitalVal = 0;
+      AnalogVal = 0;
       TimerPos = 0;
     }
   }
 
   void SendStatus(char* status)
   {
+    if (digitalRead(WIFI_DISABLE_JUMPER0) == HIGH) return;
     if(TKDClient && TKDClient.connected()) {
       TKDClient.println(status);
       TKDClient.flush();
